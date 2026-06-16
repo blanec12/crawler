@@ -1,11 +1,47 @@
 package main
 
 import (
+	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+func getHTML(rawURL string) (string, error) {
+	req, err := http.NewRequest("GET", rawURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("couldn't create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "BootCrawler/1.0")
+
+	client := &http.Client{}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("couldn't fetch webpage: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 400 {
+		return "", fmt.Errorf("received error status code: %d", res.StatusCode)
+	}
+
+	contentType := res.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "text/html") {
+		return "", fmt.Errorf("received a non-html content type: %s", contentType)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("couldn't read response body: %w", err)
+	}
+
+	return string(body), nil
+}
 
 func getHeadingFromHTML(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
